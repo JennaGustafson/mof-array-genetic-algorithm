@@ -1,4 +1,4 @@
-# MOF-sensor array simulation: GCMC simulations and probability analysis
+#MOF-array optimization: probability analysis and genetic algorithm
 
 Installation
 -------------
