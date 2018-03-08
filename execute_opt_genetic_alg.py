@@ -36,20 +36,14 @@ gases = data['gases']
 number_mofs = data['number_mofs']
 number_bins = data['number_bins']
 
+population_size = 15
+generations = 5
+mutation_rate = 0.6
+
 experimental_mass_results, experimental_mass_mofs, experimental_mofs = import_experimental_results(mof_array, experimental_mass_import, mof_densities_import, gases)
 import_data_results = import_simulated_data(experimental_mofs, all_results_import, mof_densities_import, gases)
 calculate_pmf_results = calculate_pmf(experimental_mass_results, import_data_results, experimental_mofs, stdev, mrange)
-# array_pmf_results, list_of_arrays = array_pmf(gases, number_mofs, experimental_mofs, calculate_pmf_results, experimental_mass_mofs)
-# create_bins_results = create_bins(experimental_mofs, calculate_pmf_results, gases, number_bins)
-# bin_compositions_results = bin_compositions(gases, list_of_arrays, create_bins_results, array_pmf_results, experimental_mass_mofs)
-# kl_divergence = information_gain(gases, list_of_arrays, bin_compositions_results, create_bins_results)
-# ordered_by_kld_product, ordered_by_gas, all_arrays_ranked = choose_best_arrays(gases, number_mofs, kl_divergence)
-print(mof_array)
 
 # genertic algorithm
-population_size = 10
-generations = 5
-mutation_rate = 0.5
-
 results = run_genetic_algorithm(mof_array, gases, calculate_pmf_results, population_size, number_bins, generations, mutation_rate)
 print(results)

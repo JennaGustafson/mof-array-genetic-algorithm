@@ -243,14 +243,14 @@ def array_pmf(gas_names, mof_names, calculate_pmf_results, current_population):
         selected_mofs = get_selected_mofs(mof_names, current_population[count]['geneIndex'])
         if selected_mofs == []:
             selected_mofs = [ran.choice(mof_names)]
-        mof_array_list.append(selected_mofs)
+        mof_array_list.append({'number': count, 'mof names' : selected_mofs, 'geneIndex' : current_population[count]['geneIndex']})
 
         normalized_compound_pmfs = compound_probability(selected_mofs, calculate_pmf_results)
 
         if count == 0:
             # First array, set up dict with keys for each array and gas, specifying pmfs and comps
             for index in range(len(array_temp_dict)):
-                array_dict = {'%s' % ' '.join(selected_mofs) : normalized_compound_pmfs[index]}
+                array_dict = {'%s' % count : normalized_compound_pmfs[index]}
                 for gas in gas_names:
                     array_dict.update({ '%s' % gas : float(array_temp_dict[index][gas])})
                 array_pmf.extend([array_dict])
@@ -258,11 +258,10 @@ def array_pmf(gas_names, mof_names, calculate_pmf_results, current_population):
             # Update dictionary with pmf list for each array
             for index in range(len(array_temp_dict)):
                 array_dict = array_pmf[index].copy()
-                array_dict.update({'%s' % ' '.join(selected_mofs) : normalized_compound_pmfs[index]})
+                array_dict.update({'%s' % count : normalized_compound_pmfs[index]})
                 array_pmf[index] = array_dict
 
     return(array_pmf, mof_array_list)
-    # return(normalized_compound_pmfs)
 
 def create_bins(mofs_list, calculate_pmf_results, gases, num_bins):
     """Creates bins for all gases, ranging from the lowest to highest mole fractions for each.
@@ -310,23 +309,23 @@ def bin_compositions(gases, list_of_arrays, create_bins_results, array_pmf_resul
         # Loops through all of the bins and takes sum over all pmfs in that bin.
         binned_probability_temporary = []
         for b in create_bins_results[0:len(create_bins_results)-1]:
-            temp_array_pmf = {'%s' % ' '.join(array): [] for array in list_of_arrays}
+            temp_array_pmf = {'%s' % array: [] for array in range(len(list_of_arrays))}
             for line in array_pmf_results:
                 # Checks that the gas' mole frac matches the current bin
                 if b[gas_name] == line['%s bin' % gas_name]:
                     # For each array, assigns the pmfs to their corresponding key
-                    for array in list_of_arrays:
-                        temp_pmf_list = temp_array_pmf['%s' % ' '.join(array)]
-                        temp_pmf_list.append(line['%s' % ' '.join(array)])
-                        temp_array_pmf['%s' % ' '.join(array)] = temp_pmf_list
+                    for count in range(len(list_of_arrays)):
+                        temp_pmf_list = temp_array_pmf['%s' % count]
+                        temp_pmf_list.append(line['%s' % count])
+                        temp_array_pmf['%s' % count] = temp_pmf_list
 
             # Updates pmfs for each array for current bin, summing over all pmfs
             bin_temporary = {'%s bin' % gas_name : b[gas_name]}
-            for array in list_of_arrays:
-                if temp_array_pmf['%s' % ' '.join(array)] == []:
-                    bin_temporary.update({'%s' % ' '.join(array): 0})
+            for count in range(len(list_of_arrays)):
+                if temp_array_pmf['%s' % count] == []:
+                    bin_temporary.update({'%s' % count: 0})
                 else:
-                    bin_temporary.update({'%s' % ' '.join(array) : sum(temp_array_pmf['%s' % ' '.join(array)])})
+                    bin_temporary.update({'%s' % count : sum(temp_array_pmf['%s' % count])})
 
             binned_probability_temporary.append(bin_temporary)
 
@@ -348,10 +347,10 @@ def information_gain(gas_names, list_of_arrays, bin_compositions_results, create
     reference_prob = 1/len(create_bins_results)
 
     # For each array, take list of dictionaries with results
-    for array in list_of_arrays:
-        array_gas_temp = {'mof array' : array}
+    for count in range(len(list_of_arrays)):
+        array_gas_temp = list_of_arrays[count].copy()
         for gas in gas_names:
-                pmfs_per_array = [row['%s' % ' '.join(array)] for row in bin_compositions_results if '%s bin' % gas in row.keys()]
+                pmfs_per_array = [row['%s' % count] for row in bin_compositions_results if '%s bin' % gas in row.keys()]
                 # For each array/gas combination, calculate the kld
                 kl_divergence = sum([float(pmf)*log(float(pmf)/reference_prob,2) for pmf in pmfs_per_array if pmf != 0])
                 # Result is list of dicts, dropping the pmf values
@@ -360,84 +359,29 @@ def information_gain(gas_names, list_of_arrays, bin_compositions_results, create
 
     return(array_gas_info_gain)
 
-def choose_best_arrays(gas_names, number_mofs, information_gain_results):
+def choose_best_arrays(gas_names, information_gain_results):
     """Choose the best MOF arrays by selecting the top KL scores for each gas
 
     Keyword arguments:
     gas_names -- list of gases
-    number_mofs -- minimum and maximum number of mofs in an array, usr specified in config file
     information_gain_results -- list of dictionaries including, mof array, gas, and corresponding kld
     """
     # Combine KLD values for each array,taking the product over all gases
     # for mixtures having more than two components
     ranked_by_product = []
-    if len(gas_names) > 2:
-        for each_array in information_gain_results:
+    each_array_temp = []
+    for each_array in information_gain_results:
             product_temp = reduce(operator.mul, [each_array['%s KLD' % gas] for gas in gas_names], 1)
             each_array_temp = each_array.copy()
-            each_array_temp.update({'joint_KLD' : product_temp, 'num_MOFs' : len(each_array['mof array'])})
-            ranked_by_product.append(each_array_temp)
-    else:
-        for each_array in information_gain_results:
-            each_array_temp = each_array.copy()
-            each_array_temp.update({'joint_KLD' : each_array['%s KLD' % gas_names[0]], 'num_MOFs' : len(each_array['mof array'])})
+            each_array_temp.update({'joint_KLD' : product_temp, 'num_MOFs' : len(each_array['mof names'])})
             ranked_by_product.append(each_array_temp)
 
     # Sort results from highest to lowest KLD values
-    best_ranked_by_product = sorted(ranked_by_product, key=lambda k: k['num_MOFs'], reverse=True)
     best_ranked_by_product = sorted(ranked_by_product, key=lambda k: k['joint_KLD'], reverse=True)
-    # Sort results from lowest to highest KLD values
-    worst_ranked_by_product = sorted(ranked_by_product, key=lambda k: k['num_MOFs'])
-    worst_ranked_by_product = sorted(ranked_by_product, key=lambda k: k['joint_KLD'])
 
-    arrays_to_pick_from = [best_ranked_by_product, worst_ranked_by_product]
-    top_and_bottom_arrays = []
-
-    # Saves top and bottom two arrays of each array size
-    for ranked_list in arrays_to_pick_from:
-        for num_mofs in range(min(number_mofs),max(number_mofs)+1):
-            index = 0
-            for each_array in ranked_list:
-                if index < 2 and len(each_array['mof array']) == num_mofs:
-                    top_and_bottom_arrays.append(each_array)
-                    index +=1
-
-    top_and_bottom_by_gas = []
-    # Sort by the performance of arrays per gas and sav top and bottom two at each size
-    for gas in gas_names:
-        best_per_gas = sorted(information_gain_results, key=lambda k: k['%s KLD' % gas], reverse=True)
-        worst_per_gas = sorted(information_gain_results, key=lambda k: k['%s KLD' % gas])
-        best_and_worst_gas = [best_per_gas, worst_per_gas]
-        for num_mofs in range(min(number_mofs),max(number_mofs)+1):
-            for ranked_list in best_and_worst_gas:
-                index = 0
-                for each_array in ranked_list:
-                    if index == 0 and len(each_array['mof array']) == num_mofs:
-                        top_and_bottom_by_gas.append(each_array)
-                        index +=1
-
-    return(top_and_bottom_arrays, top_and_bottom_by_gas, best_ranked_by_product)
+    return(best_ranked_by_product)
 
 # start genetic algorithm
-
-def define_one_item(item):
-    # import probability data for mof item
-    wild_card1 = random.random()*0.1
-    wild_card2 = 1 - (wild_card1 + 0.2 + 0.1 + 0.5)
-    probability = [wild_card2, 0.2, 0.1, 0.5, wild_card1]
-    return(probability)
-
-def define_item_set(mofs_list):
-#     assign probability sets for each mof
-    item_set = None
-    for item in mofs_list:
-        if item_set is not None:
-            temp_item_set = item_set.copy()
-            temp_item_set.update({item: define_one_item(item)})
-            item_set = temp_item_set
-        else:
-            item_set = {item: define_one_item(item)}
-    return(item_set)
 
 # creates one array in the first population
 def create_one_individual(mofs_list):
@@ -452,52 +396,13 @@ def create_first_population(mofs_list, population_size):
         population.append({'geneIndex': create_one_individual(mofs_list)})
     return(population)
 
-# def element_kld(item_set, selected_items):
-#     compound_probability = None
-#     for item in selected_items:
-#         if compound_probability is not None:
-#             compound_probability = [x*y for x,y in zip(compound_probability, item_set[item])]
-#         else:
-#             compound_probability = item_set[item]
-#     normalize_factor = sum(compound_probability)
-#     normalized_probability = [prob / normalize_factor for prob in compound_probability]
-#     reference_prob = 1 / len(normalized_probability)
-#     element_kld_value = sum([float(n_prob)*log((n_prob/reference_prob),2) for n_prob in normalized_probability if n_prob != 0])
-#     return(element_kld_value)
-
-# function to calculate fitness of one item
-def calculate_item_fitness(mofs_list, item_set, chosen_element):
-    selected_items = []
-    for i in range(len(chosen_element['geneIndex'])):
-        if int(chosen_element['geneIndex'][i]) == 1:
-            selected_items.append(mofs_list[i])
-        else:
-            None
-    if selected_items == []:
-        element_fitness = 0
-    else:
-        element_fitness = element_kld(item_set, selected_items)
-    return(element_fitness)
-
-# function to calculate fitness of all items
-def calculate_fitness(mofs_list, item_set, population_):
-    fitness = []
-    for current_element in population_:
-        # element_fitness = calculate_item_fitness(mofs_list, item_set, current_element)
-        element_fitness = calculate_item_fitness(mofs_list, item_set, current_element)
-        temp_element = current_element.copy()
-        temp_element.update({'fitness': element_fitness})
-        fitness.append(temp_element)
-    return(fitness)
-
 def first_population(mofs_list, population_size):
     first_population_set = create_first_population(mofs_list, population_size)
-    # fitness_final = calculate_fitness(mofs_list, item_set, first_population_set)
     return(first_population_set)
 
 # sort and pick top performing individual
-def sort_population(population_fitness):
-    ordered_population = sorted(population_fitness, key=lambda k: k['fitness'], reverse=True)
+def sort_population(gas_names, population_fitness):
+    ordered_population = choose_best_arrays(gas_names, population_fitness)
     return(ordered_population)
 
 # function to select parent items
@@ -506,17 +411,18 @@ def select_breeders(population_sorted, population_size):
     best_individuals = population_size // 5
     lucky_few = population_size // 5
     for i in range(best_individuals):
-        result.append(population_sorted[i])
+        result.append({'geneIndex': population_sorted[i]['geneIndex']})
     for i in range(lucky_few):
-        result.append(random.choice(population_sorted[best_individuals:population_size+1]))
-    random.shuffle(result)
+        lucky_one = ran.choice(population_sorted[best_individuals:population_size+1])
+        result.append({'geneIndex' : lucky_one['geneIndex']})
+    ran.shuffle(result)
     return(result)
 
 # function to perform crossover
 def create_child(individual1, individual2):
     result = []
     for i in range(len(individual1['geneIndex'])):
-        if (100 * random.random() < 50):
+        if (100 * ran.random() < 50):
             result.append(individual1['geneIndex'][i])
         else:
             result.append(individual2['geneIndex'][i])
@@ -532,7 +438,7 @@ def create_children(breeders, number_of_child):
 # function to perform mutation
 def mutate_one_individual(individual, mutationRate):
     for geneIndex in range(len(individual['geneIndex'])):
-        if (100 * random.random() < mutationRate):
+        if (100 * ran.random() < mutationRate):
             individual['geneIndex'][geneIndex] = not individual['geneIndex'][geneIndex]
     return(individual)
 
@@ -548,26 +454,26 @@ def run_genetic_algorithm(mof_names, gas_names, calculate_pmf_results, populatio
     first_population_joint_pmf, list_of_arrays = array_pmf(gas_names, mof_names, calculate_pmf_results, first_population_items)
     bin_compositions_results = bin_compositions(gas_names, list_of_arrays, create_bins_results, first_population_joint_pmf, mof_names)
     kl_divergence = information_gain(gas_names, list_of_arrays, bin_compositions_results, create_bins_results)
+    ordered_first_population = sort_population(gas_names, kl_divergence)
+    sorted_population = ordered_first_population
+    best_array = sorted_population[0]['geneIndex']
+    best_mofs = sorted_population[0]['mof names']
+    best_fitness = sorted_population[0]['joint_KLD']
+    parents = select_breeders(sorted_population, population_size)
+    for gen in range(generations):
+        population = create_children(parents, number_of_child)
+        population = mutate_population(population, mutation_rate)
+        population_joint_pmf, list_of_arrays = array_pmf(gas_names, mof_names, calculate_pmf_results, population)
+        bin_compositions_results = bin_compositions(gas_names, list_of_arrays, create_bins_results, population_joint_pmf, mof_names)
+        kl_divergence = information_gain(gas_names, list_of_arrays, bin_compositions_results, create_bins_results)
+        sorted_population = sort_population(gas_names, kl_divergence)
+        if sorted_population[0]['joint_KLD'] > best_fitness:
+            best_array = sorted_population[0]['geneIndex']
+            best_mofs = sorted_population[0]['mof names']
+            best_fitness = sorted_population[0]['joint_KLD']
+        else:
+            None
+        parents = select_breeders(sorted_population, population_size)
+        print(best_fitness)
 
-    # ordered_first_population = sort_population(first_population_fitness)
-    # sorted_population = ordered_first_population
-    # best_array = sorted_population[0]['geneIndex']
-    # best_fitness = sorted_population[0]['fitness']
-    # print(best_array, best_fitness)
-    # for gen in range(generations):
-    #     parents = select_breeders(sorted_population, population_size)
-    #     population = create_children(parents, number_of_child)
-    #     population = mutate_population(population, mutation_rate)
-    #     population_fitness = calculate_fitness(mofs_list, item_set, population)
-    #     sorted_population = sort_population(population_fitness)
-    #     if sorted_population[0]['fitness'] > best_fitness:
-    #         best_array = sorted_population[0]['geneIndex']
-    #         best_fitness = sorted_population[0]['fitness']
-    #     else:
-    #         None
-    #     print(sorted_population)
-    #     print(best_array, best_fitness)
-
-    # return([item_set, best_array, best_fitness])
-    # return(first_population_joint_pmf)
-    return(kl_divergence)
+    return([best_array, best_mofs, best_fitness])
