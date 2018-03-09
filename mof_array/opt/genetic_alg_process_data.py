@@ -447,7 +447,7 @@ def mutate_population(current_population, mutationRate):
         individual = mutate_one_individual(individual, mutationRate)
     return(current_population)
 
-def run_genetic_algorithm(mof_names, gas_names, calculate_pmf_results, population_size, number_bins, generations, mutation_rate):
+def run_genetic_algorithm(array_size, mof_names, gas_names, calculate_pmf_results, population_size, number_bins, generations, mutation_rate):
     number_of_child = 5
     create_bins_results = create_bins(mof_names, calculate_pmf_results, gas_names, number_bins)
     first_population_items = first_population(mof_names, population_size)

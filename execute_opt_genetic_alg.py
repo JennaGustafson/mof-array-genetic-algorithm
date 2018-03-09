@@ -36,6 +36,7 @@ gases = data['gases']
 number_mofs = data['number_mofs']
 number_bins = data['number_bins']
 
+array_size = 3
 population_size = 15
 generations = 5
 mutation_rate = 0.6
@@ -45,5 +46,5 @@ import_data_results = import_simulated_data(experimental_mofs, all_results_impor
 calculate_pmf_results = calculate_pmf(experimental_mass_results, import_data_results, experimental_mofs, stdev, mrange)
 
 # genertic algorithm
-results = run_genetic_algorithm(mof_array, gases, calculate_pmf_results, population_size, number_bins, generations, mutation_rate)
+results = run_genetic_algorithm(array_size, mof_array, gases, calculate_pmf_results, population_size, number_bins, generations, mutation_rate)
 print(results)
