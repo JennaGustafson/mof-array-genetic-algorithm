@@ -213,8 +213,15 @@ def compound_probability(mof_array, calculate_pmf_results):
     return(normalized_compound_pmfs)
 
 def get_selected_mofs(mof_names, current_mof_array):
+    """Creates list of mof names in an array from the current population
+
+    Keyword arguments:
+    mof_names -- list of names of all possible mofs in study
+    current_mof_array -- list of indices for current array
+    """
     selected_items = []
     for mof_index in current_mof_array:
+        # Appends the mof name corresponding to the current index value
         selected_items.append(mof_names[mof_index])
     return(selected_items)
 
@@ -226,6 +233,7 @@ def array_pmf(gas_names, mof_names, calculate_pmf_results, current_population):
     gas_names -- list of gases
     mof_names -- list of all mofs
     calculate_pmf_results -- list of dictionaries including mof, mixture, probability
+    current_population -- list of dictionaries with each array in current generation
     """
     mof_array_list = []
     array_pmf = []
@@ -233,15 +241,16 @@ def array_pmf(gas_names, mof_names, calculate_pmf_results, current_population):
     # save list of dictionaries for 1 MOF to have list of all gas mole fractions
     array_temp_dict = [row for row in calculate_pmf_results if row['MOF'] == mof_names[0]]
 
-        # Nested loops take all combinations of array/gas/experiment
-    # for mof_array in current_population:
+    # for each array's index in the current generation, calculate joint probability
     for count in range(len(current_population)):
-    # Calls outside function to calculate joint probability
+        # Calls function to set up list of MOFs in current array
         selected_mofs = get_selected_mofs(mof_names, current_population[count]['geneIndex'])
         if selected_mofs == []:
             selected_mofs = [ran.choice(mof_names)]
+        # Save each array's index and list of names
         mof_array_list.append({'number': count, 'mof names' : selected_mofs, 'geneIndex' : current_population[count]['geneIndex']})
 
+        # Calls outside function to calculate joint probability
         normalized_compound_pmfs = compound_probability(selected_mofs, calculate_pmf_results)
 
         if count == 0:
@@ -281,7 +290,7 @@ def create_bins(mofs_list, calculate_pmf_results, gases, num_bins):
 
     return(bins)
 
-def bin_compositions(gases, list_of_arrays, create_bins_results, array_pmf_results, experimental_mass_mofs):
+def bin_compositions(gases, list_of_arrays, create_bins_results, array_pmf_results):
     """Sorts pmfs into bins created by create_bins function.
 
     Keyword arguments:
@@ -289,7 +298,6 @@ def bin_compositions(gases, list_of_arrays, create_bins_results, array_pmf_resul
     list_of_arrays -- list of all array combinations
     create_bins_results -- dictionary containing bins for each gas
     array_pmf_results -- list of dictionaries, arrays, joint pmfs
-    experimental_mass_mofs -- ordered list of dictionaries with each experimental mof/mass
     """
 
     binned_probability = []
@@ -343,7 +351,7 @@ def information_gain(gas_names, list_of_arrays, bin_compositions_results, create
     array_gas_info_gain = []
     reference_prob = 1/len(create_bins_results)
 
-    # For each array, take list of dictionaries with results
+    # For each array in generation, take list of dictionaries with results
     for count in range(len(list_of_arrays)):
         array_gas_temp = list_of_arrays[count].copy()
         for gas in gas_names:
@@ -361,10 +369,9 @@ def choose_best_arrays(gas_names, information_gain_results):
 
     Keyword arguments:
     gas_names -- list of gases
-    information_gain_results -- list of dictionaries including, mof array, gas, and corresponding kld
+    information_gain_results -- list of dictionaries including, mof array index, gas, and corresponding kld
     """
     # Combine KLD values for each array,taking the product over all gases
-    # for mixtures having more than two components
     ranked_by_product = []
     each_array_temp = []
     for each_array in information_gain_results:
@@ -373,45 +380,68 @@ def choose_best_arrays(gas_names, information_gain_results):
             each_array_temp.update({'joint_KLD' : product_temp, 'num_MOFs' : len(each_array['mof names'])})
             ranked_by_product.append(each_array_temp)
 
-    # Sort results from highest to lowest KLD values
+    # Sort results from highest to lowest joint KLD values
     best_ranked_by_product = sorted(ranked_by_product, key=lambda k: k['joint_KLD'], reverse=True)
 
     return(best_ranked_by_product)
 
-# start genetic algorithm
-
-# creates one array in the first population
 def create_one_individual(array_size, mofs_list):
+    """Sets up a 'random' array for one element in the first population
+
+    Keyword arguments:
+    array_size -- number of mofs that the array must contain
+    mofs_list -- list of possible mofs to choose from
+    """
     individual = []
+    # Selects a random number from 0 to the maximum possible mof index
     new_element = ran.choice(list(range(len(mofs_list))))
+    # Loop runs if the array size is less than desired for array
     while len(individual) < array_size:
+        # Checks that the index chosen is one in the range of possible mofs
         if new_element <= len(mofs_list) - 1:
             element = new_element
         else:
+            # Takes the remainder if the number is greater than the number of possible mofs
             element = new_element % len(mofs_list)
         individual.append(element)
+        # Add new random number to previous number to avoid selecting the same as previous
         new_element += ran.choice(list(range(len(mofs_list))))
+        # Takes only unique elements in list to avoid duplicate mofs
         individual = list(set(individual))
     return(sorted(individual))
 
 def create_first_population(array_size, mofs_list, population_size):
+    """Calls function to create 'random' arrays for first population
+
+    Keyword arguments:
+    array_size -- number of mofs that the array must contain
+    mofs_list -- list of possible mofs to choose from
+    population_size -- number of arrays in one generation
+    """
     population = []
     for i in range(population_size):
         population.append({'geneIndex': create_one_individual(array_size, mofs_list)})
     return(population)
 
-def first_population(array_size, mofs_list, population_size):
-    first_population_set = create_first_population(array_size, mofs_list, population_size)
-    return(first_population_set)
-
-# sort and pick top performing individual
 def sort_population(gas_names, population_fitness):
+    """Calls function to sort arrays by joint KLD
+
+    Keyword arguments:
+    gas_names -- list of gases
+    population_fitness -- list of dictionaries including, mof array index, gas, and corresponding kld
+    """
     ordered_population = choose_best_arrays(gas_names, population_fitness)
     return(ordered_population)
 
-# function to select parent items
 def select_breeders(population_sorted, population_size):
+    """Selects top performing arrays and random others to be parents
+
+    Keyword arguments:
+    population_sorted -- ordered list of arrays
+    population_size -- number of arrays in population set
+    """
     result = []
+    # Take top 20% of arrays and random 20% of arrays
     best_individuals = population_size // 5
     lucky_few = population_size // 5
     for i in range(best_individuals):
@@ -422,32 +452,59 @@ def select_breeders(population_sorted, population_size):
     ran.shuffle(result)
     return(result)
 
-# function to perform crossover
 def create_child(individual1, individual2, mofs_list):
+    """Performs crossover with two selected parents
+
+    Keyword arguments:
+    individual1 -- parent array
+    individual2 -- parent array
+    mofs_list -- list of possible mofs to choose from
+    """
     result = []
+    # Selects each array element from a random parent
     for i in range(len(individual1['geneIndex'])):
         if (100 * ran.random() < 50):
             result.append(individual1['geneIndex'][i])
         else:
             result.append(individual2['geneIndex'][i])
+    # Takes unique elemens of array
+    result = list(set(result))
+    # Adds elements to the array until there are no duplicates
     while len(result) < len(individual1['geneIndex']):
         result.append(ran.choice(list(range(len(mofs_list)))))
         result = list(set(result))
     return(result)
 
 def create_children(breeders, number_of_child, mofs_list):
+    """Creates children by doing crossover with all parents
+
+    Keyword arguments:
+    breeders -- list of parent arrays
+    number_of_child -- how many children to create from each parent
+    mofs_list -- list of mofs to choose from
+    """
     result = []
     for i in range(len(breeders) // 2):
         for j in range(number_of_child):
             result.append({'geneIndex' : create_child(breeders[i], breeders[len(breeders) - 1 - i], mofs_list)})
     return(result)
 
-# function to perform mutation
 def mutate_one_individual(individual, mutationRate, mofs_list):
+    """Performs a mutation on one array element based on the given rate
+
+    Keyword arguments:
+    individual -- current array in population
+    mutationRate -- how often mutation should occur
+    mofs_list -- list of mofs to choose from
+    """
+    # Mutates an element in the array according to the rate
     for geneIndex in range(len(individual['geneIndex'])):
         if (100 * ran.random() < mutationRate):
+            # Chooses a random mof to replace element
             individual['geneIndex'][geneIndex] = ran.choice(list(range(len(mofs_list))))
+    # Takes all unique elements of array
     reduced_individual = list(set(individual['geneIndex']))
+    # Adds new mofs to array until there are no duplicates
     while len(reduced_individual) < len(individual['geneIndex']):
         reduced_individual.append(ran.choice(list(range(len(mofs_list)))))
         reduced_individual = list(set(reduced_individual))
@@ -455,29 +512,57 @@ def mutate_one_individual(individual, mutationRate, mofs_list):
     return(individual)
 
 def mutate_population(current_population, mutationRate, mofs_list):
+    """Sets up each array for possible mutation
+
+    Keyword arguments:
+    current_population -- list of arrays in current generation
+    mutationRate -- how often mutation should occur
+    mofs_list -- list of mofs to choose from
+    """
     for individual in current_population:
         individual = mutate_one_individual(individual, mutationRate, mofs_list)
     return(current_population)
 
 def run_genetic_algorithm(array_size, mof_names, gas_names, calculate_pmf_results, population_size, number_bins, generations, mutation_rate):
+    """Optimizes mof array of a specified size to have the maximum KLD
+
+    Keyword arguments:
+    array_size -- number of mofs in desired array
+    mof_names -- list of mofs to choose from
+    gas_names -- list of gases
+    calculate_pmf_results -- probabilities for all mof/gas mixture combinations
+    population_size -- number of arrays in each generation
+    number_bins -- number of bins specified by user in config file
+    generations -- numer of times to run the optimization
+    mutation_rate -- how often mutation should occur
+    """
     number_of_child = 5
     create_bins_results = create_bins(mof_names, calculate_pmf_results, gas_names, number_bins)
-    first_population_items = first_population(array_size, mof_names, population_size)
+
+    # Set up first population of test arrays and calculate KLD values
+    first_population_items = create_first_population(array_size, mof_names, population_size)
     first_population_joint_pmf, list_of_arrays = array_pmf(gas_names, mof_names, calculate_pmf_results, first_population_items)
-    bin_compositions_results = bin_compositions(gas_names, list_of_arrays, create_bins_results, first_population_joint_pmf, mof_names)
+    bin_compositions_results = bin_compositions(gas_names, list_of_arrays, create_bins_results, first_population_joint_pmf)
     kl_divergence = information_gain(gas_names, list_of_arrays, bin_compositions_results, create_bins_results)
-    ordered_first_population = sort_population(gas_names, kl_divergence)
-    sorted_population = ordered_first_population
+
+    # Order according to highest KLD value, saving top performing array
+    sorted_population = sort_population(gas_names, kl_divergence)
     best_array = sorted_population[0]['geneIndex']
     best_mofs = sorted_population[0]['mof names']
     best_fitness = sorted_population[0]['joint_KLD']
+
+    # Select first set of parents to create next generation of arrays
     parents = select_breeders(sorted_population, population_size)
+
     for gen in range(generations):
+        # Perform crossover and mutation to create next generation of arrays
         population = create_children(parents, number_of_child, mof_names)
         population = mutate_population(population, mutation_rate, mof_names)
+        # Calculate probabilities and KLD values for new arrays
         population_joint_pmf, list_of_arrays = array_pmf(gas_names, mof_names, calculate_pmf_results, population)
-        bin_compositions_results = bin_compositions(gas_names, list_of_arrays, create_bins_results, population_joint_pmf, mof_names)
+        bin_compositions_results = bin_compositions(gas_names, list_of_arrays, create_bins_results, population_joint_pmf)
         kl_divergence = information_gain(gas_names, list_of_arrays, bin_compositions_results, create_bins_results)
+        # Sort by KLD and replace top performing array if there is one with a higher KLD
         sorted_population = sort_population(gas_names, kl_divergence)
         if sorted_population[0]['joint_KLD'] > best_fitness:
             best_array = sorted_population[0]['geneIndex']
@@ -485,6 +570,7 @@ def run_genetic_algorithm(array_size, mof_names, gas_names, calculate_pmf_result
             best_fitness = sorted_population[0]['joint_KLD']
         else:
             None
+        # Select parents for next generation of arrays
         parents = select_breeders(sorted_population, population_size)
         print(best_fitness)
 
