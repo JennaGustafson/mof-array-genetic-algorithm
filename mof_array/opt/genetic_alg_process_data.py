@@ -245,8 +245,6 @@ def array_pmf(gas_names, mof_names, calculate_pmf_results, current_population):
     for count in range(len(current_population)):
         # Calls function to set up list of MOFs in current array
         selected_mofs = get_selected_mofs(mof_names, current_population[count]['geneIndex'])
-        if selected_mofs == []:
-            selected_mofs = [ran.choice(mof_names)]
         # Save each array's index and list of names
         mof_array_list.append({'number': count, 'mof names' : selected_mofs, 'geneIndex' : current_population[count]['geneIndex']})
 
