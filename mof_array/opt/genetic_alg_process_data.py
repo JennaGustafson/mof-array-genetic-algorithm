@@ -214,11 +214,8 @@ def compound_probability(mof_array, calculate_pmf_results):
 
 def get_selected_mofs(mof_names, current_mof_array):
     selected_items = []
-    for i in range(len(current_mof_array)):
-        if int(current_mof_array[i]) == 1:
-            selected_items.append(mof_names[i])
-        else:
-            None
+    for mof_index in current_mof_array:
+        selected_items.append(mof_names[mof_index])
     return(selected_items)
 
 def array_pmf(gas_names, mof_names, calculate_pmf_results, current_population):
@@ -384,20 +381,27 @@ def choose_best_arrays(gas_names, information_gain_results):
 # start genetic algorithm
 
 # creates one array in the first population
-def create_one_individual(mofs_list):
+def create_one_individual(array_size, mofs_list):
     individual = []
-    for mof_name in mofs_list:
-        individual.append(ran.choice([True,False]))
-    return(individual)
+    new_element = ran.choice(list(range(len(mofs_list))))
+    while len(individual) < array_size:
+        if new_element <= len(mofs_list) - 1:
+            element = new_element
+        else:
+            element = new_element % len(mofs_list)
+        individual.append(element)
+        new_element += ran.choice(list(range(len(mofs_list))))
+        individual = list(set(individual))
+    return(sorted(individual))
 
-def create_first_population(mofs_list, population_size):
+def create_first_population(array_size, mofs_list, population_size):
     population = []
     for i in range(population_size):
-        population.append({'geneIndex': create_one_individual(mofs_list)})
+        population.append({'geneIndex': create_one_individual(array_size, mofs_list)})
     return(population)
 
-def first_population(mofs_list, population_size):
-    first_population_set = create_first_population(mofs_list, population_size)
+def first_population(array_size, mofs_list, population_size):
+    first_population_set = create_first_population(array_size, mofs_list, population_size)
     return(first_population_set)
 
 # sort and pick top performing individual
@@ -419,38 +423,46 @@ def select_breeders(population_sorted, population_size):
     return(result)
 
 # function to perform crossover
-def create_child(individual1, individual2):
+def create_child(individual1, individual2, mofs_list):
     result = []
     for i in range(len(individual1['geneIndex'])):
         if (100 * ran.random() < 50):
             result.append(individual1['geneIndex'][i])
         else:
             result.append(individual2['geneIndex'][i])
+    while len(result) < len(individual1['geneIndex']):
+        result.append(ran.choice(list(range(len(mofs_list)))))
+        result = list(set(result))
     return(result)
 
-def create_children(breeders, number_of_child):
+def create_children(breeders, number_of_child, mofs_list):
     result = []
     for i in range(len(breeders) // 2):
         for j in range(number_of_child):
-            result.append({'geneIndex' : create_child(breeders[i], breeders[len(breeders) - 1 - i])})
+            result.append({'geneIndex' : create_child(breeders[i], breeders[len(breeders) - 1 - i], mofs_list)})
     return(result)
 
 # function to perform mutation
-def mutate_one_individual(individual, mutationRate):
+def mutate_one_individual(individual, mutationRate, mofs_list):
     for geneIndex in range(len(individual['geneIndex'])):
         if (100 * ran.random() < mutationRate):
-            individual['geneIndex'][geneIndex] = not individual['geneIndex'][geneIndex]
+            individual['geneIndex'][geneIndex] = ran.choice(list(range(len(mofs_list))))
+    reduced_individual = list(set(individual['geneIndex']))
+    while len(reduced_individual) < len(individual['geneIndex']):
+        reduced_individual.append(ran.choice(list(range(len(mofs_list)))))
+        reduced_individual = list(set(reduced_individual))
+    individual['geneIndex'] = sorted(reduced_individual)
     return(individual)
 
-def mutate_population(current_population, mutationRate):
+def mutate_population(current_population, mutationRate, mofs_list):
     for individual in current_population:
-        individual = mutate_one_individual(individual, mutationRate)
+        individual = mutate_one_individual(individual, mutationRate, mofs_list)
     return(current_population)
 
 def run_genetic_algorithm(array_size, mof_names, gas_names, calculate_pmf_results, population_size, number_bins, generations, mutation_rate):
     number_of_child = 5
     create_bins_results = create_bins(mof_names, calculate_pmf_results, gas_names, number_bins)
-    first_population_items = first_population(mof_names, population_size)
+    first_population_items = first_population(array_size, mof_names, population_size)
     first_population_joint_pmf, list_of_arrays = array_pmf(gas_names, mof_names, calculate_pmf_results, first_population_items)
     bin_compositions_results = bin_compositions(gas_names, list_of_arrays, create_bins_results, first_population_joint_pmf, mof_names)
     kl_divergence = information_gain(gas_names, list_of_arrays, bin_compositions_results, create_bins_results)
@@ -461,8 +473,8 @@ def run_genetic_algorithm(array_size, mof_names, gas_names, calculate_pmf_result
     best_fitness = sorted_population[0]['joint_KLD']
     parents = select_breeders(sorted_population, population_size)
     for gen in range(generations):
-        population = create_children(parents, number_of_child)
-        population = mutate_population(population, mutation_rate)
+        population = create_children(parents, number_of_child, mof_names)
+        population = mutate_population(population, mutation_rate, mof_names)
         population_joint_pmf, list_of_arrays = array_pmf(gas_names, mof_names, calculate_pmf_results, population)
         bin_compositions_results = bin_compositions(gas_names, list_of_arrays, create_bins_results, population_joint_pmf, mof_names)
         kl_divergence = information_gain(gas_names, list_of_arrays, bin_compositions_results, create_bins_results)
