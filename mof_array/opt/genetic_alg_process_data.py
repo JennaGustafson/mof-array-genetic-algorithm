@@ -570,6 +570,6 @@ def run_genetic_algorithm(array_size, mof_names, gas_names, calculate_pmf_result
             None
         # Select parents for next generation of arrays
         parents = select_breeders(sorted_population, population_size)
-        print(best_fitness)
+        print(gen, best_fitness, best_mofs)
 
     return([best_array, best_mofs, best_fitness])
