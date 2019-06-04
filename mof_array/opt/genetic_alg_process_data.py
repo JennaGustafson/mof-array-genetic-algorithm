@@ -551,6 +551,7 @@ def run_genetic_algorithm(array_size, mof_names, gas_names, calculate_pmf_result
 
     # Select first set of parents to create next generation of arrays
     parents = select_breeders(sorted_population, population_size)
+    results_by_generation = []
 
     for gen in range(generations):
         # Perform crossover and mutation to create next generation of arrays
@@ -570,6 +571,6 @@ def run_genetic_algorithm(array_size, mof_names, gas_names, calculate_pmf_result
             None
         # Select parents for next generation of arrays
         parents = select_breeders(sorted_population, population_size)
-        print(gen, best_fitness, best_mofs)
+        results_by_generation.append([gen, best_fitness, best_mofs])
 
-    return([best_array, best_mofs, best_fitness])
+    return([best_array, best_mofs, best_fitness], results_by_generation)

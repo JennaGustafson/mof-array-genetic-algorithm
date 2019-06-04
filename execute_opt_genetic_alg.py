@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import sys
-
 from datetime import datetime
 from mof_array.opt.genetic_alg_process_data import (read_output_data,
                                             yaml_loader,
@@ -14,7 +13,6 @@ from mof_array.opt.genetic_alg_process_data import (read_output_data,
                                             information_gain,
                                             choose_best_arrays,
                                             run_genetic_algorithm)
-
 all_results_import = read_output_data(sys.argv[1])
 experimental_mass_import = read_output_data(sys.argv[2])
 
@@ -44,5 +42,5 @@ mutation_rate = data['mutation_rate']
 experimental_mass_results, experimental_mass_mofs, experimental_mofs = import_experimental_results(mof_array, experimental_mass_import, mof_densities_import, gases)
 import_data_results = import_simulated_data(experimental_mofs, all_results_import, mof_densities_import, gases)
 calculate_pmf_results = calculate_pmf(experimental_mass_results, import_data_results, experimental_mofs, stdev, mrange)
-results = run_genetic_algorithm(array_size, mof_array, gases, calculate_pmf_results, population_size, number_bins, generations, mutation_rate)
+results, save_results = run_genetic_algorithm(array_size, mof_array, gases, calculate_pmf_results, population_size, number_bins, generations, mutation_rate)
 print(results)
